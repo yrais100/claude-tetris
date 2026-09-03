@@ -43,6 +43,18 @@ jobs:
                Si ningún label encaja, no asignes ninguno.
             4. Publica UN comentario de diagnóstico en ESPAÑOL con:
                gh issue comment ${{ github.event.issue.number }} --body "..."
+
+               El comentario debe estar escrito en Markdown válido de GitHub
+               (GitHub Flavored Markdown) para que se renderice correctamente:
+               - Usa saltos de línea reales, no la secuencia literal "\n".
+               - Deja una línea en blanco entre encabezados, párrafos, listas y
+                 bloques de código para que GitHub los separe bien.
+               - Encabezados con "## ", ítems de lista con "- ", código y nombres
+                 de funciones/archivos entre backticks (`game.js`, `spawn()`),
+                 bloques de código con ``` y su lenguaje.
+               - Si el cuerpo tiene varias líneas, pásalo con --body-file - y
+                 heredoc, o con varios --body, para no romper el formato.
+
                El comentario debe seguir esta estructura Markdown:
 
                ## 🔍 Diagnóstico automático
