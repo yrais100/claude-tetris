@@ -1,0 +1,75 @@
+name: Claude Issue Triage
+
+on:
+  issues:
+    types: [opened, edited]
+
+jobs:
+  triage:
+    # Evita re-disparos por ediciones hechas por bots (incluido el propio Claude)
+    if: github.event.sender.type != 'Bot'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      id-token: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Run Claude issue triage
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: '--allowedTools "Bash(gh label list),Bash(gh issue view:*),Bash(gh issue edit:*),Bash(gh issue comment:*)"'
+          prompt: |
+            Estás haciendo el triaje del issue #${{ github.event.issue.number }}
+            del repositorio ${{ github.repository }}.
+
+            Contexto del proyecto: lee CLAUDE.md en la raíz del repo para entender
+            la arquitectura (Tetris en JS vanilla sobre Canvas: index.html,
+            style.css, game.js).
+
+            Pasos:
+            1. Lee el issue con:
+               gh issue view ${{ github.event.issue.number }} --json title,body,labels,author
+            2. Consulta los labels disponibles con: gh label list
+               SOLO puedes usar labels que ya existan. No crees labels nuevas.
+            3. Asigna los labels que correspondan (uno o varios) con:
+               gh issue edit ${{ github.event.issue.number }} --add-label "label1,label2"
+               Si el issue ya tiene labels correctos, no los quites; solo añade los que falten.
+               Si ningún label encaja, no asignes ninguno.
+            4. Publica UN comentario de diagnóstico en ESPAÑOL con:
+               gh issue comment ${{ github.event.issue.number }} --body "..."
+               El comentario debe seguir esta estructura Markdown:
+
+               ## 🔍 Diagnóstico automático
+
+               **Tipo:** (bug / mejora / duda / documentación / etc.)
+
+               **Resumen del problema:** 2-3 frases.
+
+               **Archivos y funciones probablemente involucrados:**
+               - `game.js` → `funciónX()` — por qué
+               - ...
+
+               **Hipótesis de causa raíz:** análisis técnico basado en el código.
+
+               **Pasos para reproducir (si aplica):** ...
+
+               **Enfoque sugerido para la solución:** pasos concretos, sin escribir
+               todavía el código completo.
+
+               **Riesgos / cosas a vigilar:** ej. dimensiones hard-coded del canvas,
+               mezcla de idiomas en la UI, alcance minimalista del proyecto.
+
+               ---
+               *Generado automáticamente por Claude. Revisar antes de implementar.*
+
+            5. Si el issue fue editado y ya existe un comentario de diagnóstico
+               previo tuyo, publica uno nuevo actualizado (no hace falta borrar el
+               anterior) e indícalo al inicio con "_(diagnóstico actualizado tras edición)_".
+
+            Sé conciso y técnico. No implementes la solución ni edites archivos de código.
