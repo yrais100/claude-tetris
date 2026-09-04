@@ -13,7 +13,15 @@ const COLORS = [
   '#e57373', // Z - red
   '#90caf9', // J - pale blue
   '#ffb74d', // L - orange
+  '#b0bec5', // tuerca - gris metálico
 ];
+
+// Centinela del hueco central de la tuerca: sólido para la pieza que cae,
+// pero atravesable en el tablero y no cuenta para limpiar líneas.
+const HOLE = 9;
+
+// Probabilidad de que salga la tuerca (pieza-reto); el resto se reparte 1..7.
+const NUT_CHANCE = 1 / 12;
 
 const PIECES = [
   null,
@@ -24,6 +32,7 @@ const PIECES = [
   [[5,5,0],[0,5,5],[0,0,0]],                  // Z
   [[6,0,0],[6,6,6],[0,0,0]],                  // J
   [[0,0,7],[7,7,7],[0,0,0]],                  // L
+  [[8,8,8],[8,HOLE,8],[8,8,8]],               // tuerca
 ];
 
 const LINE_SCORES = [0, 100, 300, 500, 800];
@@ -44,10 +53,12 @@ const themeToggle = document.getElementById('theme-toggle');
 const THEME_KEY = 'tetris-theme';
 
 let board, current, next, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId;
-let gridColor;
+let gridColor, boardBg;
 
 function updateGridColor() {
-  gridColor = getComputedStyle(document.body).getPropertyValue('--grid-color').trim();
+  const cs = getComputedStyle(document.body);
+  gridColor = cs.getPropertyValue('--grid-color').trim();
+  boardBg = cs.getPropertyValue('--board-bg').trim();
 }
 
 function applyTheme(theme) {
@@ -74,7 +85,7 @@ function createBoard() {
 }
 
 function randomPiece() {
-  const type = Math.floor(Math.random() * 7) + 1;
+  const type = Math.random() < NUT_CHANCE ? 8 : Math.floor(Math.random() * 7) + 1;
   const shape = PIECES[type].map(row => [...row]);
   return { type, shape, x: Math.floor(COLS / 2) - Math.floor(shape[0].length / 2), y: 0 };
 }
@@ -86,7 +97,7 @@ function collide(shape, ox, oy) {
       const nx = ox + c;
       const ny = oy + r;
       if (nx < 0 || nx >= COLS || ny >= ROWS) return true;
-      if (ny >= 0 && board[ny][nx]) return true;
+      if (ny >= 0 && board[ny][nx] && board[ny][nx] !== HOLE) return true;
     }
   }
   return false;
@@ -115,15 +126,21 @@ function tryRotate() {
 
 function merge() {
   for (let r = 0; r < current.shape.length; r++)
-    for (let c = 0; c < current.shape[r].length; c++)
-      if (current.shape[r][c])
-        board[current.y + r][current.x + c] = current.shape[r][c];
+    for (let c = 0; c < current.shape[r].length; c++) {
+      const v = current.shape[r][c];
+      if (!v) continue;
+      const y = current.y + r, x = current.x + c;
+      // El hueco de la tuerca solo se estampa sobre celda vacía; nunca borra
+      // un bloque existente. Las celdas normales sí sobrescriben un hueco.
+      if (v === HOLE) { if (!board[y][x]) board[y][x] = HOLE; }
+      else board[y][x] = v;
+    }
 }
 
 function clearLines() {
   let cleared = 0;
   for (let r = ROWS - 1; r >= 0; r--) {
-    if (board[r].every(v => v !== 0)) {
+    if (board[r].every(v => v !== 0 && v !== HOLE)) {
       board.splice(r, 1);
       board.unshift(new Array(COLS).fill(0));
       cleared++;
@@ -185,6 +202,19 @@ function updateHUD() {
 
 function drawBlock(context, x, y, colorIndex, size, alpha) {
   if (!colorIndex) return;
+  if (colorIndex === HOLE) {
+    const cx = x * size + size / 2, cy = y * size + size / 2, rad = size / 2 - 3;
+    context.globalAlpha = alpha ?? 1;
+    context.fillStyle = boardBg;
+    context.beginPath();
+    context.arc(cx, cy, rad, 0, Math.PI * 2);
+    context.fill();
+    context.strokeStyle = COLORS[8];
+    context.lineWidth = 2;
+    context.stroke();
+    context.globalAlpha = 1;
+    return;
+  }
   const color = COLORS[colorIndex];
   context.globalAlpha = alpha ?? 1;
   context.fillStyle = color;
